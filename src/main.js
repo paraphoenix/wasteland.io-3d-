@@ -1,4 +1,3 @@
-
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
@@ -18,6 +17,8 @@ import { createAncientRuins } from "./environment/AncientRuins.js";
 
 import { createRuneCircle } from "./magic/RuneCircle.js";
 import { createMagicOrbs } from "./magic/MagicOrbs.js";
+
+import { createWizard } from "./characters/Wizard.js";
 
 
 /*
@@ -51,9 +52,11 @@ const controls = new OrbitControls(
 );
 
 controls.enableDamping = true;
+
 controls.dampingFactor = 0.05;
 
 controls.minDistance = 5;
+
 controls.maxDistance = 35;
 
 controls.maxPolarAngle =
@@ -102,37 +105,62 @@ createMagicOrbs(scene);
 
 /*
 =========================================================
+CHARACTER
+=========================================================
+*/
+
+createWizard(scene);
+
+
+/*
+=========================================================
 ANIMATION
 =========================================================
 */
 
-const clock = new THREE.Clock();
+const clock =
+    new THREE.Clock();
+
 
 function animate() {
 
-    requestAnimationFrame(animate);
+    requestAnimationFrame(
+        animate
+    );
+
 
     const time =
         clock.getElapsedTime();
 
+
     controls.update();
 
-    scene.traverse((object) => {
 
-        if (
-            object.userData &&
-            typeof object.userData.update === "function"
-        ) {
-            object.userData.update(time);
+    scene.traverse(
+        (object) => {
+
+            if (
+                object.userData &&
+                typeof object.userData.update ===
+                "function"
+            ) {
+
+                object.userData.update(
+                    time
+                );
+
+            }
+
         }
+    );
 
-    });
 
     renderer.render(
         scene,
         camera
     );
 }
+
 
 animate();
 
@@ -151,7 +179,9 @@ window.addEventListener(
             window.innerWidth /
             window.innerHeight;
 
+
         camera.updateProjectionMatrix();
+
 
         renderer.setSize(
             window.innerWidth,
