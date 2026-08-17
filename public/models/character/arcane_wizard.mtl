@@ -1,0 +1,50 @@
+# Material Library for Wizard Model
+
+newmtl mat_Robe
+Kd 0.1725 0.2431 0.3137
+Ka 0.2000 0.2000 0.2000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+
+newmtl mat_InnerRobe
+Kd 0.1020 0.1451 0.1843
+Ka 0.2000 0.2000 0.2000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+
+newmtl mat_Trim
+Kd 0.5569 0.2667 0.6784
+Ka 0.2000 0.2000 0.2000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+
+newmtl mat_Beard
+Kd 0.9255 0.9412 0.9451
+Ka 0.2000 0.2000 0.2000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+
+newmtl mat_Wood
+Kd 0.2902 0.1804 0.0941
+Ka 0.2000 0.2000 0.2000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+
+newmtl mat_Crystal
+Kd 0.0000 0.9412 1.0000
+Ka 0.2000 0.2000 0.2000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+
