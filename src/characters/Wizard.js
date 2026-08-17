@@ -4,17 +4,11 @@ import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 
 export function createWizard(scene) {
 
-    console.log("================================");
-    console.log("WIZARD SYSTEM STARTING");
-    console.log("================================");
-
-
     const wizardGroup =
         new THREE.Group();
 
     wizardGroup.name =
         "ArcaneWizard";
-
 
     scene.add(
         wizardGroup
@@ -23,36 +17,65 @@ export function createWizard(scene) {
 
     /*
     =====================================================
-    TEST MARKER
+    MOVEMENT
     =====================================================
     */
 
-    const marker =
-        new THREE.Mesh(
+    const keys = {
 
-            new THREE.SphereGeometry(
-                0.3,
-                8,
-                8
-            ),
-
-            new THREE.MeshStandardMaterial({
-
-                color: 0xff00ff,
-
-                emissive: 0xff00ff,
-
-                emissiveIntensity: 3
-            })
-        );
+        w: false,
+        a: false,
+        s: false,
+        d: false
+    };
 
 
-    marker.position.y =
-        3;
+    const movementSpeed = 4;
 
 
-    wizardGroup.add(
-        marker
+    window.addEventListener(
+        "keydown",
+        (event) => {
+
+            const key =
+                event.key.toLowerCase();
+
+
+            if (
+                key === "w" ||
+                key === "a" ||
+                key === "s" ||
+                key === "d"
+            ) {
+
+                keys[key] = true;
+
+            }
+
+        }
+    );
+
+
+    window.addEventListener(
+        "keyup",
+        (event) => {
+
+            const key =
+                event.key.toLowerCase();
+
+
+            if (
+                key === "w" ||
+                key === "a" ||
+                key === "s" ||
+                key === "d"
+            ) {
+
+                keys[key] = false;
+
+            }
+
+        }
     );
 
 
@@ -66,41 +89,15 @@ export function createWizard(scene) {
         new OBJLoader();
 
 
-    const modelPath =
-        "/models/character/arcane_wizard.obj";
-
-
-    console.log(
-        "Loading wizard:",
-        modelPath
-    );
-
-
     loader.load(
 
-        modelPath,
+        "/models/character/arcane_wizard.obj",
 
-
-        /*
-        SUCCESS
-        */
 
         (object) => {
 
             console.log(
-                "================================"
-            );
-
-            console.log(
-                "WIZARD OBJ LOADED SUCCESSFULLY"
-            );
-
-            console.log(
-                object
-            );
-
-            console.log(
-                "================================"
+                "Wizard OBJ loaded"
             );
 
 
@@ -118,6 +115,7 @@ export function createWizard(scene) {
                     metalness: 0.05,
 
                     flatShading: true
+
                 });
 
 
@@ -135,22 +133,11 @@ export function createWizard(scene) {
                         child.material =
                             material;
 
-
                         child.castShadow =
                             true;
 
-
                         child.receiveShadow =
                             true;
-
-
-                        if (
-                            child.geometry
-                        ) {
-
-                            child.geometry
-                                .computeVertexNormals();
-                        }
 
                     }
 
@@ -159,9 +146,7 @@ export function createWizard(scene) {
 
 
             /*
-            =================================================
-            MODEL SCALE
-            =================================================
+            SCALE
             */
 
             object.scale.set(
@@ -172,9 +157,7 @@ export function createWizard(scene) {
 
 
             /*
-            =================================================
-            MODEL POSITION
-            =================================================
+            POSITION
             */
 
             object.position.set(
@@ -184,29 +167,14 @@ export function createWizard(scene) {
             );
 
 
-            /*
-            =================================================
-            ADD MODEL
-            =================================================
-            */
-
             wizardGroup.add(
                 object
             );
 
 
             /*
-            REMOVE TEST MARKER
-            */
-
-            wizardGroup.remove(
-                marker
-            );
-
-
-            /*
             =================================================
-            MAGIC LIGHT
+            MAGIC LIGHTS
             =================================================
             */
 
@@ -252,18 +220,129 @@ export function createWizard(scene) {
 
             /*
             =================================================
-            ANIMATION
+            UPDATE
             =================================================
             */
 
             wizardGroup.userData.update =
                 function(time) {
 
-                    wizardGroup.position.y =
-                        Math.sin(
-                            time * 1.5
-                        ) * 0.04;
+                    /*
+                    -----------------------------------------
+                    MOVEMENT VECTOR
+                    -----------------------------------------
+                    */
 
+                    const direction =
+                        new THREE.Vector3();
+
+
+                    if (keys.w) {
+
+                        direction.z -= 1;
+
+                    }
+
+
+                    if (keys.s) {
+
+                        direction.z += 1;
+
+                    }
+
+
+                    if (keys.a) {
+
+                        direction.x -= 1;
+
+                    }
+
+
+                    if (keys.d) {
+
+                        direction.x += 1;
+
+                    }
+
+
+                    /*
+                    -----------------------------------------
+                    MOVE
+                    -----------------------------------------
+                    */
+
+                    if (
+                        direction.lengthSq() > 0
+                    ) {
+
+                        direction.normalize();
+
+
+                        wizardGroup.position.x +=
+                            direction.x *
+                            movementSpeed *
+                            0.016;
+
+
+                        wizardGroup.position.z +=
+                            direction.z *
+                            movementSpeed *
+                            0.016;
+
+
+                        /*
+                        -------------------------------------
+                        FACE MOVEMENT DIRECTION
+                        -------------------------------------
+                        */
+
+                        const targetRotation =
+                            Math.atan2(
+                                direction.x,
+                                direction.z
+                            );
+
+
+                        wizardGroup.rotation.y +=
+                            (
+                                targetRotation -
+                                wizardGroup.rotation.y
+                            ) *
+                            0.15;
+
+                    }
+
+
+                    /*
+                    -----------------------------------------
+                    IDLE FLOAT
+                    -----------------------------------------
+                    */
+
+                    if (
+                        direction.lengthSq() === 0
+                    ) {
+
+                        wizardGroup.position.y =
+                            Math.sin(
+                                time * 1.5
+                            ) * 0.04;
+
+                    } else {
+
+                        wizardGroup.position.y =
+                            Math.sin(
+                                time * 8
+                            ) * 0.015;
+
+                    }
+
+
+                    /*
+                    -----------------------------------------
+                    MAGIC LIGHT PULSE
+                    -----------------------------------------
+                    */
 
                     purpleLight.intensity =
                         2.5 +
@@ -285,7 +364,7 @@ export function createWizard(scene) {
 
         /*
         =====================================================
-        PROGRESS
+        LOADING
         =====================================================
         */
 
@@ -296,19 +375,13 @@ export function createWizard(scene) {
             ) {
 
                 console.log(
-                    "Wizard loading:",
+                    "Wizard:",
                     Math.round(
                         (
                             xhr.loaded /
                             xhr.total
                         ) * 100
                     ) + "%"
-                );
-
-            } else {
-
-                console.log(
-                    "Wizard loading..."
                 );
 
             }
@@ -325,24 +398,8 @@ export function createWizard(scene) {
         (error) => {
 
             console.error(
-                "================================"
-            );
-
-            console.error(
-                "WIZARD OBJ FAILED TO LOAD"
-            );
-
-            console.error(
+                "Wizard loading failed:",
                 error
-            );
-
-            console.error(
-                "PATH:",
-                modelPath
-            );
-
-            console.error(
-                "================================"
             );
 
         }
