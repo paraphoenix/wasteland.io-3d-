@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Arcane Wizard - Lightning Spell Cast</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+            font-family: monospace;
+        }
+        body {
+            background-color: #0d0d14;
+            color: #eee;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(18, 18, 26, 0.85);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #2a2a38;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        h1 {
+            font-size: 16px;
+            color: #00f0ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        p {
+            font-size: 12px;
+            color: #aaa;
+        }
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        button {
+            background: #2a2a38;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-family: monospace;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        button.cast-btn {
+            background: #00f0ff;
+            color: #0d0d14;
+            border: none;
+        }
+        button.cast-btn:hover {
+            background: #00b8c4;
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+        }
+        button.export-btn:hover {
+            background: #3b3b4f;
+        }
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(18, 18, 26, 0.85);
+            padding: 10px 14px;
+            border-radius: 6px;
+            border: 1px solid #2a2a38;
+            font-size: 11px;
+            color: #888;
+        }
+    </style>
+    <!-- Import Three.js, OrbitControls, OBJExporter -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/OBJExporter.js"></script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="ui">
+        <h1>Unbound Arcanist</h1>
+        <p>Style: Low-Poly Mesh</p>
+        <div class="btn-group">
+            <button id="cast-btn" class="cast-btn">⚡ CAST LIGHTNING [SPACE]</button>
+            <button id="export-btn" class="export-btn">EXPORT .OBJ & .MTL</button>
+        </div>
+    </div>
+    <div class="controls-hint">
+        [Space] Shoot Lightning | [Left Mouse] Rotate | [Right Mouse] Pan | [Scroll] Zoom
+    </div>
+
+    <script>
+        // --- SCENE SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0d0d14);
+        scene.fog = new THREE.FogExp2(0x0d0d14, 0.03);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 3, 8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 + 0.1;
+        controls.target.set(0, 1.8, 0);
+
+        // --- LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0x1a1a2e, 1.2);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 7);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        const staffLight = new THREE.PointLight(0x00f0ff, 2, 5);
+        scene.add(staffLight);
+
+        const flashLight = new THREE.PointLight(0x00ffff, 0, 10);
+        scene.add(flashLight);
+
+        // --- PEDESTAL & TARGET MARKER ---
+        const pedestalGeo = new THREE.CylinderGeometry(1.8, 2, 0.2, 8);
+        const pedestalMat = new THREE.MeshStandardMaterial({ color: 0x181824, roughness: 0.8 });
+        const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
+        pedestal.position.y = -0.1;
+        pedestal.receiveShadow = true;
+        scene.add(pedestal);
+
+        // Impact scorched ground ring
+        const targetRingGeo = new THREE.RingGeometry(0.3, 0.5, 8);
+        const targetRingMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.3 });
+        const targetRing = new THREE.Mesh(targetRingGeo, targetRingMat);
+        targetRing.rotation.x = Math.PI / 2;
+        targetRing.position.set(2.2, 0.01, 2.0);
+        scene.add(targetRing);
+
+        // --- WIZARD CHARACTER GROUP ---
+        const wizardGroup = new THREE.Group();
+        scene.add(wizardGroup);
+
+        // Materials
+        const robeMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.6, flatShading: true, name: 'mat_Robe' });
+        const innerRobeMat = new THREE.MeshStandardMaterial({ color: 0x1a252f, roughness: 0.7, flatShading: true, name: 'mat_InnerRobe' });
+        const trimMat = new THREE.MeshStandardMaterial({ color: 0x8e44ad, roughness: 0.4, flatShading: true, name: 'mat_Trim' });
+        const beardMat = new THREE.MeshStandardMaterial({ color: 0xecf0f1, roughness: 0.9, flatShading: true, name: 'mat_Beard' });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e18, roughness: 0.8, flatShading: true, name: 'mat_Wood' });
+        const crystalMat = new THREE.MeshStandardMaterial({ 
+            color: 0x00f0ff, 
+            emissive: 0x00aaff, 
+            emissiveIntensity: 0.8, 
+            roughness: 0.2, 
+            flatShading: true,
+            name: 'mat_Crystal'
+        });
+
+        // Body Meshes
+        const skirtGeo = new THREE.ConeGeometry(0.9, 2.2, 8, 1, true);
+        const skirt = new THREE.Mesh(skirtGeo, robeMat);
+        skirt.position.y = 1.1;
+        wizardGroup.add(skirt);
+
+        const torsoGeo = new THREE.CylinderGeometry(0.4, 0.6, 1.2, 7);
+        const torso = new THREE.Mesh(torsoGeo, robeMat);
+        torso.position.y = 2.2;
+        wizardGroup.add(torso);
+
+        const mantleGeo = new THREE.ConeGeometry(0.75, 0.5, 7);
+        const mantle = new THREE.Mesh(mantleGeo, trimMat);
+        mantle.position.y = 2.7;
+        mantle.rotation.x = Math.PI;
+        wizardGroup.add(mantle);
+
+        const hoodGeo = new THREE.ConeGeometry(0.45, 0.9, 6);
+        const hood = new THREE.Mesh(hoodGeo, robeMat);
+        hood.position.set(0, 3.1, -0.05);
+        hood.rotation.x = -0.2;
+        wizardGroup.add(hood);
+
+        const faceShadowGeo = new THREE.SphereGeometry(0.25, 6, 6);
+        const faceShadow = new THREE.Mesh(faceShadowGeo, innerRobeMat);
+        faceShadow.position.set(0, 2.95, 0.1);
+        wizardGroup.add(faceShadow);
+
+        const beardGeo = new THREE.ConeGeometry(0.28, 0.9, 5);
+        const beard = new THREE.Mesh(beardGeo, beardMat);
+        beard.position.set(0, 2.65, 0.25);
+        beard.rotation.x = 0.2;
+        wizardGroup.add(beard);
+
+        const sleeveGeo = new THREE.CylinderGeometry(0.15, 0.3, 1.0, 6);
+        
+        // Left Arm
+        const leftSleeve = new THREE.Mesh(sleeveGeo, robeMat);
+        leftSleeve.position.set(-0.6, 2.3, 0.1);
+        leftSleeve.rotation.z = 0.4;
+        leftSleeve.rotation.x = -0.2;
+        wizardGroup.add(leftSleeve);
+
+        // Right Arm Pivot Group (For Casting Animation)
+        const rightArmPivot = new THREE.Group();
+        rightArmPivot.position.set(0.5, 2.5, 0);
+        wizardGroup.add(rightArmPivot);
+
+        const rightSleeve = new THREE.Mesh(sleeveGeo, robeMat);
+        rightSleeve.position.set(0.1, -0.4, 0.2);
+        rightSleeve.rotation.z = -0.2;
+        rightSleeve.rotation.x = 0.5;
+        rightArmPivot.add(rightSleeve);
+
+        // Staff & Floating Crystal attached to Right Arm Pivot
+        const staffGroup = new THREE.Group();
+        staffGroup.position.set(0.3, -0.5, 0.4);
+
+        const shaftGeo = new THREE.CylinderGeometry(0.04, 0.05, 3.2, 5);
+        const shaft = new THREE.Mesh(shaftGeo, woodMat);
+        shaft.position.y = 1.1;
+        staffGroup.add(shaft);
+
+        const cuspGeo = new THREE.ConeGeometry(0.2, 0.5, 5, 1, true);
+        const cusp = new THREE.Mesh(cuspGeo, trimMat);
+        cusp.position.y = 2.6;
+        cusp.rotation.x = Math.PI;
+        staffGroup.add(cusp);
+
+        const crystalGeo = new THREE.OctahedronGeometry(0.2, 0);
+        const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+        crystal.position.y = 2.95;
+        staffGroup.add(crystal);
+
+        rightArmPivot.add(staffGroup);
+
+        // --- PROCEDURAL LIGHTNING MESH SYSTEM ---
+        let lightningMesh = null;
+
+        function createLightningBolt(startVec, endVec) {
+            if (lightningMesh) scene.remove(lightningMesh);
+
+            const points = [];
+            const segments = 12;
+            const current = startVec.clone();
+            const direction = endVec.clone().sub(startVec);
+            const step = direction.clone().divideScalar(segments);
+
+            points.push(current.clone());
+
+            for (let i = 1; i < segments; i++) {
+                const nextPoint = startVec.clone().add(step.clone().multiplyScalar(i));
+                // Add jagged random deviation
+                nextPoint.x += (Math.random() - 0.5) * 0.4;
+                nextPoint.y += (Math.random() - 0.5) * 0.4;
+                nextPoint.z += (Math.random() - 0.5) * 0.4;
+                points.push(nextPoint);
+            }
+            points.push(endVec.clone());
+
+            const curve = new THREE.CatmullRomCurve3(points);
+            const tubeGeo = new THREE.TubeGeometry(curve, 24, 0.05, 6, false);
+            const tubeMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+
+            lightningMesh = new THREE.Mesh(tubeGeo, tubeMat);
+            scene.add(lightningMesh);
+        }
+
+        function removeLightning() {
+            if (lightningMesh) {
+                scene.remove(lightningMesh);
+                lightningMesh = null;
+            }
+        }
+
+        // --- CASTING ANIMATION STATE ---
+        let isCasting = false;
+        let castProgress = 0;
+
+        function triggerLightningCast() {
+            if (isCasting) return;
+            isCasting = true;
+            castProgress = 0;
+        }
+
+        document.getElementById('cast-btn').addEventListener('click', triggerLightningCast);
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                triggerLightningCast();
+            }
+        });
+
+        // --- OBJ & MTL EXPORT ---
+        function downloadFile(contents, filename, mimeType) {
+            const blob = new Blob([contents], { type: mimeType });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        function generateMTL() {
+            const materials = [robeMat, innerRobeMat, trimMat, beardMat, woodMat, crystalMat];
+            let mtlText = `# Material Library for Wizard Model\n\n`;
+            materials.forEach(mat => {
+                const col = mat.color;
+                mtlText += `newmtl ${mat.name}\nKd ${col.r.toFixed(4)} ${col.g.toFixed(4)} ${col.b.toFixed(4)}\nKa 0.2000 0.2000 0.2000\nKs 0.1000 0.1000 0.1000\nNs 10.0\nd 1.0\nillum 2\n\n`;
+            });
+            return mtlText;
+        }
+
+        document.getElementById('export-btn').addEventListener('click', () => {
+            const exporter = new THREE.OBJExporter();
+            let objData = `mtllib wizard_arcanist.mtl\n` + exporter.parse(wizardGroup);
+            downloadFile(objData, 'wizard_arcanist.obj', 'text/plain');
+            setTimeout(() => downloadFile(generateMTL(), 'wizard_arcanist.mtl', 'text/plain'), 300);
+        });
+
+        // --- ANIMATION & RENDER LOOP ---
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = clock.getElapsedTime();
+
+            // 1. Idle Float Animation
+            wizardGroup.position.y = Math.sin(time * 1.5) * 0.08 + 0.08;
+
+            // Rotate staff crystal
+            crystal.rotation.y = time * 1.2;
+            crystal.rotation.x = Math.sin(time) * 0.3;
+            crystal.position.y = 2.95 + Math.sin(time * 3) * 0.05;
+
+            // 2. Arm & Staff Casting Animation State
+            if (isCasting) {
+                castProgress += 0.04;
+
+                if (castProgress < 0.3) {
+                    // Wind up: Raise hand and staff forward
+                    rightArmPivot.rotation.x = THREE.MathUtils.lerp(rightArmPivot.rotation.x, -1.2, 0.2);
+                    rightArmPivot.rotation.y = THREE.MathUtils.lerp(rightArmPivot.rotation.y, 0.4, 0.2);
+                } else if (castProgress < 0.7) {
+                    // Strike: Hold pose and bolt active
+                    rightArmPivot.rotation.x = -1.4;
+                    
+                    // World positions for lightning source and impact target
+                    const crystalWorldPos = new THREE.Vector3();
+                    crystal.getWorldPosition(crystalWorldPos);
+                    
+                    const targetPos = targetRing.position.clone();
+
+                    createLightningBolt(crystalWorldPos, targetPos);
+
+                    // Flash effects
+                    flashLight.position.copy(crystalWorldPos);
+                    flashLight.intensity = 5 + Math.random() * 5;
+                    crystalMat.emissiveIntensity = 2.0;
+                } else if (castProgress < 1.0) {
+                    // Release: Fade out lightning and return arm back to idle
+                    removeLightning();
+                    flashLight.intensity = 0;
+                    crystalMat.emissiveIntensity = 0.8;
+                    rightArmPivot.rotation.x = THREE.MathUtils.lerp(rightArmPivot.rotation.x, 0, 0.15);
+                    rightArmPivot.rotation.y = THREE.MathUtils.lerp(rightArmPivot.rotation.y, 0, 0.15);
+                } else {
+                    // End Animation
+                    isCasting = false;
+                    removeLightning();
+                    flashLight.intensity = 0;
+                    rightArmPivot.rotation.x = 0;
+                    rightArmPivot.rotation.y = 0;
+                }
+            }
+
+            // Staff Crystal Ambient Light
+            const crystalPos = new THREE.Vector3();
+            crystal.getWorldPosition(crystalPos);
+            staffLight.position.copy(crystalPos);
+            staffLight.intensity = 1.5 + Math.sin(time * 4) * 0.5;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // --- RESIZE HANDLER ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
