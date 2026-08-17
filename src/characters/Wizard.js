@@ -1,13 +1,24 @@
 import * as THREE from "three";
-import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader.js";
-import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 
 export function createWizard(scene) {
 
-    const wizardGroup = new THREE.Group();
-    wizardGroup.name = "ArcaneWizard";
-    scene.add(wizardGroup);
+    /*
+    =====================================================
+    WIZARD ROOT
+    =====================================================
+    */
+
+    const wizardGroup =
+        new THREE.Group();
+
+    wizardGroup.name =
+        "ArcaneWizard";
+
+    scene.add(
+        wizardGroup
+    );
 
 
     /*
@@ -17,188 +28,779 @@ export function createWizard(scene) {
     */
 
     const keys = {
+
         w: false,
         a: false,
         s: false,
         d: false
+
     };
+
 
     const movementSpeed = 4;
 
 
     /*
     =====================================================
-    WIZARD PARTS
+    GLB
+    =====================================================
+    */
+
+    let wizardModel = null;
+
+    let mixer = null;
+
+    let animations = [];
+
+    let idleAction = null;
+
+    let castAction = null;
+
+    let currentAction = null;
+
+
+    /*
+    =====================================================
+    STAFF
     =====================================================
     */
 
     let staff = null;
+
     let staffGem = null;
-    let leftHand = null;          // new – left hand mesh (if found)
 
 
     /*
     =====================================================
-    SPELL STATE
-    =====================================================
-    */
-
-    let casting = false;
-    let castTime = 0;
-    const castDuration = 0.75;
-    let spell = null;
-
-
-    /*
-    =====================================================
-    MAGIC LIGHTS
+    MAGIC
     =====================================================
     */
 
     let purpleLight = null;
+
     let cyanLight = null;
 
+    let lightning = null;
 
-    /*
-    =====================================================
-    KEYBOARD
-    =====================================================
-    */
+    let casting = false;
 
-    window.addEventListener("keydown", (event) => {
-        const key = event.key.toLowerCase();
+    let castTimer = 0;
 
-        if (key === "w" || key === "a" || key === "s" || key === "d") {
-            keys[key] = true;
-        }
-
-        if (key === "e" && !event.repeat) {
-            castLightning();
-        }
-    });
-
-    window.addEventListener("keyup", (event) => {
-        const key = event.key.toLowerCase();
-
-        if (key === "w" || key === "a" || key === "s" || key === "d") {
-            keys[key] = false;
-        }
-    });
+    const castDuration = 0.9;
 
 
     /*
     =====================================================
-    FIND WIZARD PARTS
+    INPUT
     =====================================================
     */
 
-    function findParts(object) {
-        let partNumber = 0;
+    window.addEventListener(
+        "keydown",
+        (event) => {
 
-        object.traverse((child) => {
-            if (!child.isMesh) return;
+            const key =
+                event.key.toLowerCase();
 
-            partNumber++;
 
-            // existing staff references
-            if (partNumber === 10) staff = child;
-            if (partNumber === 11) staffGem = child;
-
-            // try to catch a left-hand mesh by name (common in many models)
-            const name = (child.name || "").toLowerCase();
             if (
-                (name.includes("hand") || name.includes("palm") || name.includes("wrist")) &&
-                (name.includes("left") || name.includes("l_") || name.includes("_l"))
+                key === "w" ||
+                key === "a" ||
+                key === "s" ||
+                key === "d"
             ) {
-                leftHand = child;
+
+                keys[key] = true;
+
             }
 
-            // fallback – you can change this number after inspecting the console
-            if (partNumber === 6 && !leftHand) {
-                leftHand = child;
-            }
-        });
 
-        console.log("Staff:", staff);
-        console.log("Staff Gem:", staffGem);
-        console.log("Left Hand:", leftHand);
-    }
+            if (
+                key === "e" &&
+                !event.repeat
+            ) {
+
+                startCast();
+
+            }
+
+
+            if (
+                event.code === "Space" &&
+                !event.repeat
+            ) {
+
+                startCast();
+
+            }
+
+        }
+    );
+
+
+    window.addEventListener(
+        "keyup",
+        (event) => {
+
+            const key =
+                event.key.toLowerCase();
+
+
+            if (
+                key === "w" ||
+                key === "a" ||
+                key === "s" ||
+                key === "d"
+            ) {
+
+                keys[key] = false;
+
+            }
+
+        }
+    );
 
 
     /*
     =====================================================
-    GET LEFT HAND WORLD POSITION
+    FIND STAFF
     =====================================================
     */
 
-    function getLeftHandPosition() {
-        // Prefer the actual mesh if we found it
-        if (leftHand) {
-            const pos = new THREE.Vector3();
-            leftHand.getWorldPosition(pos);
-            return pos;
+    function findStaff(object) {
+
+        object.traverse(
+            (child) => {
+
+                if (!child.isMesh) {
+
+                    return;
+
+                }
+
+
+                const name =
+                    child.name.toLowerCase();
+
+
+                if (
+                    name.includes("staffgem") ||
+                    name.includes("staff_gem") ||
+                    name.includes("gem")
+                ) {
+
+                    if (!staffGem) {
+
+                        staffGem =
+                            child;
+
+                    }
+
+                }
+
+
+                if (
+                    name === "staff" ||
+                    name.includes("staff")
+                ) {
+
+                    if (!staff) {
+
+                        staff =
+                            child;
+
+                    }
+
+                }
+
+            }
+        );
+
+
+        /*
+        If the GLB has no names,
+        use mesh order as fallback.
+        */
+
+        if (!staff || !staffGem) {
+
+            let meshes = [];
+
+
+            object.traverse(
+                (child) => {
+
+                    if (
+                        child.isMesh
+                    ) {
+
+                        meshes.push(
+                            child
+                        );
+
+                    }
+
+                }
+            );
+
+
+            /*
+            Previous OBJ structure:
+
+            10 = Staff
+            11 = Staff Gem
+            */
+
+            if (
+                !staff &&
+                meshes[9]
+            ) {
+
+                staff =
+                    meshes[9];
+
+            }
+
+
+            if (
+                !staffGem &&
+                meshes[10]
+            ) {
+
+                staffGem =
+                    meshes[10];
+
+            }
+
         }
 
-        // Fallback – approximate left-hand location relative to the wizard
-        // (height ~ chest / shoulder, offset to the left side)
-        const localOffset = new THREE.Vector3(-1.35, 2.55, 0.15);
-        localOffset.applyQuaternion(wizardGroup.quaternion);
 
-        return wizardGroup.position.clone().add(localOffset);
+        if (staff) {
+
+            staff.name =
+                "Staff";
+
+        }
+
+
+        if (staffGem) {
+
+            staffGem.name =
+                "StaffGem";
+
+        }
+
+
+        console.log(
+            "Staff:",
+            staff
+        );
+
+
+        console.log(
+            "Staff Gem:",
+            staffGem
+        );
+
     }
 
 
     /*
     =====================================================
-    GET WIZARD FORWARD
+    FIND ANIMATIONS
+    =====================================================
+    */
+
+    function setupAnimations(
+        gltf
+    ) {
+
+        animations =
+            gltf.animations || [];
+
+
+        console.log(
+            "GLB animations:",
+            animations.length
+        );
+
+
+        animations.forEach(
+            (clip, index) => {
+
+                console.log(
+                    "Animation",
+                    index,
+                    ":",
+                    clip.name,
+                    "duration:",
+                    clip.duration
+                );
+
+            }
+        );
+
+
+        if (
+            !wizardModel ||
+            animations.length === 0
+        ) {
+
+            console.log(
+                "No embedded animations found."
+            );
+
+            return;
+
+        }
+
+
+        mixer =
+            new THREE.AnimationMixer(
+                wizardModel
+            );
+
+
+        /*
+        Try to identify animations
+        by their names.
+        */
+
+        const idleClip =
+            animations.find(
+                (clip) => {
+
+                    const name =
+                        clip.name.toLowerCase();
+
+                    return (
+                        name.includes("idle")
+                    );
+
+                }
+            );
+
+
+        const castClip =
+            animations.find(
+                (clip) => {
+
+                    const name =
+                        clip.name.toLowerCase();
+
+                    return (
+                        name.includes("cast") ||
+                        name.includes("attack") ||
+                        name.includes("spell") ||
+                        name.includes("lightning") ||
+                        name.includes("shoot")
+                    );
+
+                }
+            );
+
+
+        if (idleClip) {
+
+            idleAction =
+                mixer.clipAction(
+                    idleClip
+                );
+
+        }
+
+
+        if (castClip) {
+
+            castAction =
+                mixer.clipAction(
+                    castClip
+                );
+
+        }
+
+
+        /*
+        If there is only one animation,
+        use it as idle.
+        */
+
+        if (
+            animations.length === 1 &&
+            !idleAction
+        ) {
+
+            idleAction =
+                mixer.clipAction(
+                    animations[0]
+                );
+
+        }
+
+
+        /*
+        Start idle.
+        */
+
+        if (idleAction) {
+
+            idleAction.play();
+
+            currentAction =
+                idleAction;
+
+        }
+
+
+        console.log(
+            "Wizard animation system ready"
+        );
+
+    }
+
+
+    /*
+    =====================================================
+    PLAY CAST ANIMATION
+    =====================================================
+    */
+
+    function playCastAnimation() {
+
+        if (
+            !mixer ||
+            !castAction
+        ) {
+
+            return;
+
+        }
+
+
+        if (
+            currentAction &&
+            currentAction !== castAction
+        ) {
+
+            currentAction.fadeOut(
+                0.12
+            );
+
+        }
+
+
+        castAction.reset();
+
+        castAction.setLoop(
+            THREE.LoopOnce,
+            1
+        );
+
+        castAction.clampWhenFinished =
+            true;
+
+        castAction.fadeIn(
+            0.12
+        );
+
+        castAction.play();
+
+        currentAction =
+            castAction;
+
+
+        /*
+        Return to idle
+        after the animation.
+        */
+
+        const duration =
+            castAction.getClip()
+                .duration;
+
+
+        setTimeout(
+            () => {
+
+                if (
+                    !casting &&
+                    idleAction
+                ) {
+
+                    castAction.fadeOut(
+                        0.12
+                    );
+
+                    idleAction.reset();
+
+                    idleAction.fadeIn(
+                        0.12
+                    );
+
+                    idleAction.play();
+
+                    currentAction =
+                        idleAction;
+
+                }
+
+            },
+            duration * 1000
+        );
+
+    }
+
+
+    /*
+    =====================================================
+    STAFF WORLD POSITION
+    =====================================================
+    */
+
+    function getStaffPosition() {
+
+        const position =
+            new THREE.Vector3();
+
+
+        if (staffGem) {
+
+            staffGem.getWorldPosition(
+                position
+            );
+
+            return position;
+
+        }
+
+
+        if (staff) {
+
+            staff.getWorldPosition(
+                position
+            );
+
+            return position;
+
+        }
+
+
+        /*
+        Fallback
+        */
+
+        wizardGroup
+            .getWorldPosition(
+                position
+            );
+
+
+        position.y += 3;
+
+        return position;
+
+    }
+
+
+    /*
+    =====================================================
+    FORWARD DIRECTION
     =====================================================
     */
 
     function getForwardDirection() {
-        const direction = new THREE.Vector3(0, 0, -1);
-        direction.applyQuaternion(wizardGroup.quaternion);
+
+        const direction =
+            new THREE.Vector3(
+                0,
+                0,
+                -1
+            );
+
+
+        direction.applyQuaternion(
+            wizardGroup.quaternion
+        );
+
+
         direction.normalize();
+
+
         return direction;
+
     }
 
 
     /*
     =====================================================
-    CAST LIGHTNING
+    START CAST
+    =====================================================
+    */
+
+    function startCast() {
+
+        if (casting) {
+
+            return;
+
+        }
+
+
+        casting =
+            true;
+
+        castTimer =
+            0;
+
+
+        console.log(
+            "⚡ ARCANE CAST"
+        );
+
+
+        playCastAnimation();
+
+    }
+
+
+    /*
+    =====================================================
+    LIGHTNING
     =====================================================
     */
 
     function castLightning() {
-        if (casting) return;
 
-        casting = true;
-        castTime = 0;
+        /*
+        Remove previous lightning.
+        */
 
-        console.log("⚡ CASTING LIGHTNING FROM LEFT HAND");
+        if (lightning) {
 
-        createLightning();
-    }
+            scene.remove(
+                lightning
+            );
 
+            lightning =
+                null;
 
-    /*
-    =====================================================
-    CREATE LIGHTNING
-    =====================================================
-    */
-
-    function createLightning() {
-        if (spell) {
-            scene.remove(spell);
-            spell = null;
         }
 
-        const group = new THREE.Group();
 
-        const start = getLeftHandPosition();          // ← now from left hand
-        const direction = getForwardDirection();
+        const group =
+            new THREE.Group();
 
-        const distance = 14;
-        const speed = 28;
+
+        /*
+        Start exactly at staff.
+        */
+
+        const start =
+            getStaffPosition();
+
+
+        /*
+        Forward from wizard.
+        */
+
+        const direction =
+            getForwardDirection();
+
+
+        const distance =
+            14;
+
+
+        const end =
+            start.clone().add(
+                direction
+                    .clone()
+                    .multiplyScalar(
+                        distance
+                    )
+            );
+
+
+        /*
+        =================================================
+        ZIGZAG
+        =================================================
+        */
+
+        const points = [];
+
+        const segments = 20;
+
+
+        for (
+            let i = 0;
+            i <= segments;
+            i++
+        ) {
+
+            const t =
+                i / segments;
+
+
+            const point =
+                new THREE.Vector3()
+                    .lerpVectors(
+                        start,
+                        end,
+                        t
+                    );
+
+
+            if (
+                i !== 0 &&
+                i !== segments
+            ) {
+
+                const side =
+                    new THREE.Vector3(
+                        1,
+                        0.35,
+                        0.2
+                    );
+
+
+                side.applyQuaternion(
+                    wizardGroup.quaternion
+                );
+
+
+                point.add(
+                    side.multiplyScalar(
+                        (
+                            Math.random() -
+                            0.5
+                        ) * 0.55
+                    )
+                );
+
+
+                point.y +=
+                    (
+                        Math.random() -
+                        0.5
+                    ) * 0.5;
+
+            }
+
+
+            points.push(
+                point
+            );
+
+        }
+
+
+        const geometry =
+            new THREE.BufferGeometry()
+                .setFromPoints(
+                    points
+                );
+
 
         /*
         =================================================
@@ -206,283 +808,620 @@ export function createWizard(scene) {
         =================================================
         */
 
-        const boltGeometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(2 * 3);
+        const core =
+            new THREE.Line(
+                geometry,
+                new THREE.LineBasicMaterial({
 
-        positions[0] = start.x;
-        positions[1] = start.y;
-        positions[2] = start.z;
-        positions[3] = start.x;
-        positions[4] = start.y;
-        positions[5] = start.z;
+                    color: 0xffffff
 
-        boltGeometry.setAttribute(
-            "position",
-            new THREE.BufferAttribute(positions, 3)
+                })
+            );
+
+
+        group.add(
+            core
         );
 
-        const coreMaterial = new THREE.LineBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 1
-        });
-
-        const core = new THREE.Line(boltGeometry, coreMaterial);
-        group.add(core);
 
         /*
         =================================================
-        GLOW
+        PURPLE GLOW
         =================================================
         */
 
-        const glowMaterial = new THREE.LineBasicMaterial({
-            color: 0x704cff,
-            transparent: true,
-            opacity: 0.6
-        });
+        const glow =
+            new THREE.Line(
+                geometry,
+                new THREE.LineBasicMaterial({
 
-        const glow = new THREE.Line(boltGeometry, glowMaterial);
-        group.add(glow);
+                    color: 0x714cff,
 
-        /*
-        =================================================
-        LIGHT
-        =================================================
-        */
+                    transparent: true,
 
-        const light = new THREE.PointLight(0x8d6cff, 5, 8);
-        light.position.copy(start);
-        group.add(light);
+                    opacity: 0.5
 
-        /*
-        =================================================
-        SPELL DATA
-        =================================================
-        */
-
-        group.userData.start = start.clone();
-        group.userData.direction = direction.clone();
-        group.userData.distance = distance;
-        group.userData.speed = speed;
-        group.userData.travel = 0;
-        group.userData.core = core;
-        group.userData.glow = glow;
-        group.userData.light = light;
-        group.userData.life = 0;
-
-        /*
-        =================================================
-        SPELL UPDATE
-        =================================================
-        */
-
-        group.userData.update = function (delta) {
-            this.travel += this.speed * delta;
-
-            const traveled = Math.min(this.travel, this.distance);
-
-            const head = this.start
-                .clone()
-                .add(this.direction.clone().multiplyScalar(traveled));
-
-            // Lightning zigzag
-            const points = [];
-            const segments = 12;
-
-            for (let i = 0; i <= segments; i++) {
-                const t = i / segments;
-                const point = new THREE.Vector3().lerpVectors(this.start, head, t);
-
-                if (i !== 0 && i !== segments) {
-                    const side = new THREE.Vector3(1, 0.4, 0.2);
-                    side.applyQuaternion(wizardGroup.quaternion);
-                    point.add(side.multiplyScalar((Math.random() - 0.5) * 0.45));
-                }
-
-                points.push(point);
-            }
-
-            const array = new Float32Array(points.length * 3);
-            for (let i = 0; i < points.length; i++) {
-                array[i * 3] = points[i].x;
-                array[i * 3 + 1] = points[i].y;
-                array[i * 3 + 2] = points[i].z;
-            }
-
-            this.core.geometry.setAttribute(
-                "position",
-                new THREE.BufferAttribute(array, 3)
+                })
             );
-            this.core.geometry.attributes.position.needsUpdate = true;
-            this.glow.geometry = this.core.geometry;
 
-            this.light.position.copy(head);
-            this.light.intensity = 3 + Math.random() * 5;
 
-            if (this.travel >= this.distance) {
-                this.life += delta;
-                if (this.life > 0.08) {
-                    scene.remove(spell);
-                    spell = null;
+        glow.scale.set(
+            1.8,
+            1.8,
+            1.8
+        );
+
+
+        group.add(
+            glow
+        );
+
+
+        /*
+        =================================================
+        LIGHT FLASH
+        =================================================
+        */
+
+        const flash =
+            new THREE.PointLight(
+                0x805cff,
+                12,
+                10
+            );
+
+
+        flash.position.copy(
+            start
+        );
+
+
+        group.add(
+            flash
+        );
+
+
+        scene.add(
+            group
+        );
+
+
+        lightning =
+            group;
+
+
+        /*
+        =================================================
+        MAGIC LIGHT PULSE
+        =================================================
+        */
+
+        if (purpleLight) {
+
+            purpleLight.intensity =
+                12;
+
+        }
+
+
+        if (cyanLight) {
+
+            cyanLight.intensity =
+                8;
+
+        }
+
+
+        /*
+        =================================================
+        REMOVE LIGHTNING
+        =================================================
+        */
+
+        setTimeout(
+            () => {
+
+                if (
+                    lightning === group
+                ) {
+
+                    scene.remove(
+                        group
+                    );
+
+                    lightning =
+                        null;
+
                 }
-            }
-        };
 
-        scene.add(group);
-        spell = group;
+            },
+            180
+        );
+
     }
 
 
     /*
     =====================================================
-    LOAD MATERIAL
+    CAST UPDATE
     =====================================================
     */
 
-    const mtlLoader = new MTLLoader();
+    function updateCast(
+        delta
+    ) {
 
-    mtlLoader.load(
-        "/models/character/arcane_wizard.mtl",
+        if (!casting) {
 
-        (materials) => {
-            materials.preload();
+            return;
 
-            const objLoader = new OBJLoader();
-            objLoader.setMaterials(materials);
+        }
 
-            objLoader.load(
-                "/models/character/arcane_wizard.obj",
 
-                (object) => {
-                    console.log("Arcane Wizard loaded");
+        castTimer +=
+            delta;
 
-                    findParts(object);
 
-                    // Shadows + flat shading
-                    object.traverse((child) => {
-                        if (child.isMesh) {
-                            child.castShadow = true;
-                            child.receiveShadow = true;
+        /*
+        Lightning fires
+        roughly halfway through
+        the casting motion.
+        */
 
-                            if (child.material) {
-                                child.material.flatShading = true;
-                                child.material.needsUpdate = true;
-                            }
+        if (
+            castTimer >= 0.45 &&
+            castTimer - delta < 0.45
+        ) {
+
+            castLightning();
+
+        }
+
+
+        /*
+        Finish procedural cast timer.
+
+        The actual hand movement
+        comes from the GLB animation.
+        */
+
+        if (
+            castTimer >= castDuration
+        ) {
+
+            casting =
+                false;
+
+            castTimer =
+                0;
+
+
+            if (
+                purpleLight
+            ) {
+
+                purpleLight.intensity =
+                    2.5;
+
+            }
+
+
+            if (
+                cyanLight
+            ) {
+
+                cyanLight.intensity =
+                    1.5;
+
+            }
+
+
+            /*
+            Return to idle animation.
+            */
+
+            if (
+                idleAction &&
+                castAction
+            ) {
+
+                castAction.fadeOut(
+                    0.12
+                );
+
+                idleAction.reset();
+
+                idleAction.fadeIn(
+                    0.12
+                );
+
+                idleAction.play();
+
+                currentAction =
+                    idleAction;
+
+            }
+
+        }
+
+    }
+
+
+    /*
+    =====================================================
+    LOAD GLB
+    =====================================================
+    */
+
+    const loader =
+        new GLTFLoader();
+
+
+    loader.load(
+
+        "/models/character/arcane_wizard.glb",
+
+
+        (gltf) => {
+
+            console.log(
+                "Arcane Wizard GLB loaded"
+            );
+
+
+            wizardModel =
+                gltf.scene;
+
+
+            wizardModel.name =
+                "WizardModel";
+
+
+            /*
+            =================================================
+            MODEL
+            =================================================
+            */
+
+            wizardModel.traverse(
+                (child) => {
+
+                    if (
+                        child.isMesh
+                    ) {
+
+                        child.castShadow =
+                            true;
+
+                        child.receiveShadow =
+                            true;
+
+
+                        if (
+                            child.material
+                        ) {
+
+                            child.material
+                                .flatShading =
+                                true;
+
+                            child.material
+                                .needsUpdate =
+                                true;
+
                         }
-                    });
 
-                    wizardGroup.add(object);
-
-                    // Purple light
-                    purpleLight = new THREE.PointLight(0x7b4dff, 2.5, 8);
-                    purpleLight.position.set(0, 3, 1);
-                    wizardGroup.add(purpleLight);
-
-                    // Cyan light
-                    cyanLight = new THREE.PointLight(0x00eaff, 1.5, 7);
-                    cyanLight.position.set(-2, 2, 1);
-                    wizardGroup.add(cyanLight);
-
-
-                    /*
-                    =================================================
-                    UPDATE
-                    =================================================
-                    */
-
-                    wizardGroup.userData.update = function (time) {
-
-                        // ---------- MOVEMENT ----------
-                        const direction = new THREE.Vector3();
-
-                        if (keys.w) direction.z -= 1;
-                        if (keys.s) direction.z += 1;
-                        if (keys.a) direction.x -= 1;
-                        if (keys.d) direction.x += 1;
-
-                        if (direction.lengthSq() > 0) {
-                            direction.normalize();
-
-                            wizardGroup.position.x += direction.x * movementSpeed * 0.016;
-                            wizardGroup.position.z += direction.z * movementSpeed * 0.016;
-
-                            const targetRotation = Math.atan2(direction.x, direction.z);
-                            let difference = targetRotation - wizardGroup.rotation.y;
-                            difference = Math.atan2(Math.sin(difference), Math.cos(difference));
-                            wizardGroup.rotation.y += difference * 0.15;
-                        }
-
-                        // ---------- IDLE FLOAT ----------
-                        if (!casting) {
-                            wizardGroup.position.y = Math.sin(time * 1.5) * 0.04;
-                        }
-
-                        // ---------- CASTING + LEFT HAND ROTATION ----------
-                        if (casting) {
-                            castTime += 0.016;
-
-                            // Spin / rotate the left hand while casting
-                            if (leftHand) {
-                                leftHand.rotation.z += 0.25;          // continuous spin
-                                // optional extra motion:
-                                // leftHand.rotation.x = Math.sin(time * 12) * 0.4;
-                            }
-
-                            if (purpleLight) {
-                                purpleLight.intensity = 4 + Math.sin(time * 15) * 1.5;
-                            }
-                            if (cyanLight) {
-                                cyanLight.intensity = 3 + Math.sin(time * 18) * 1.2;
-                            }
-
-                            if (castTime >= castDuration) {
-                                casting = false;
-                                castTime = 0;
-
-                                // Reset hand rotation when cast ends
-                                if (leftHand) {
-                                    leftHand.rotation.set(0, 0, 0);
-                                }
-                            }
-                        }
-
-                        // ---------- UPDATE LIGHTNING ----------
-                        if (spell && spell.userData.update) {
-                            spell.userData.update(0.016);
-                        }
-
-                        // ---------- NORMAL MAGIC LIGHTS ----------
-                        if (!casting && purpleLight) {
-                            purpleLight.intensity = 2.5 + Math.sin(time * 3) * 0.5;
-                        }
-                        if (!casting && cyanLight) {
-                            cyanLight.intensity = 1.5 + Math.sin(time * 4) * 0.4;
-                        }
-                    };
-                },
-
-                (xhr) => {
-                    if (xhr.total > 0) {
-                        console.log(
-                            "Wizard OBJ:",
-                            Math.round((xhr.loaded / xhr.total) * 100) + "%"
-                        );
                     }
-                },
 
-                (error) => {
-                    console.error("Wizard OBJ loading failed:", error);
                 }
             );
+
+
+            /*
+            =================================================
+            ADD MODEL
+            =================================================
+            */
+
+            wizardGroup.add(
+                wizardModel
+            );
+
+
+            /*
+            =================================================
+            FIND STAFF
+            =================================================
+            */
+
+            findStaff(
+                wizardModel
+            );
+
+
+            /*
+            =================================================
+            ANIMATIONS
+            =================================================
+            */
+
+            setupAnimations(
+                gltf
+            );
+
+
+            /*
+            =================================================
+            MAGIC LIGHT
+            =================================================
+            */
+
+            purpleLight =
+                new THREE.PointLight(
+                    0x7b4dff,
+                    2.5,
+                    8
+                );
+
+
+            purpleLight.position.set(
+                0,
+                3,
+                1
+            );
+
+
+            wizardGroup.add(
+                purpleLight
+            );
+
+
+            cyanLight =
+                new THREE.PointLight(
+                    0x00eaff,
+                    1.5,
+                    7
+                );
+
+
+            cyanLight.position.set(
+                -2,
+                2,
+                1
+            );
+
+
+            wizardGroup.add(
+                cyanLight
+            );
+
+
+            console.log(
+                "Arcane Wizard ready"
+            );
+
         },
 
-        undefined,
+
+        /*
+        =================================================
+        PROGRESS
+        =================================================
+        */
+
+        (xhr) => {
+
+            if (
+                xhr.total > 0
+            ) {
+
+                console.log(
+                    "Wizard GLB:",
+                    Math.round(
+                        (
+                            xhr.loaded /
+                            xhr.total
+                        ) * 100
+                    ) + "%"
+                );
+
+            }
+
+        },
+
+
+        /*
+        =================================================
+        ERROR
+        =================================================
+        */
 
         (error) => {
-            console.error("Wizard MTL loading failed:", error);
+
+            console.error(
+                "Wizard GLB loading failed:",
+                error
+            );
+
         }
+
     );
 
+
+    /*
+    =====================================================
+    UPDATE
+    =====================================================
+    */
+
+    wizardGroup.userData.update =
+        function(time) {
+
+            /*
+            =================================================
+            MOVEMENT
+            =================================================
+            */
+
+            const direction =
+                new THREE.Vector3();
+
+
+            if (keys.w) {
+
+                direction.z -= 1;
+
+            }
+
+
+            if (keys.s) {
+
+                direction.z += 1;
+
+            }
+
+
+            if (keys.a) {
+
+                direction.x -= 1;
+
+            }
+
+
+            if (keys.d) {
+
+                direction.x += 1;
+
+            }
+
+
+            if (
+                direction.lengthSq() > 0
+            ) {
+
+                direction.normalize();
+
+
+                wizardGroup.position.x +=
+                    direction.x *
+                    movementSpeed *
+                    0.016;
+
+
+                wizardGroup.position.z +=
+                    direction.z *
+                    movementSpeed *
+                    0.016;
+
+
+                const targetRotation =
+                    Math.atan2(
+                        direction.x,
+                        direction.z
+                    );
+
+
+                let difference =
+                    targetRotation -
+                    wizardGroup.rotation.y;
+
+
+                difference =
+                    Math.atan2(
+                        Math.sin(
+                            difference
+                        ),
+                        Math.cos(
+                            difference
+                        )
+                    );
+
+
+                wizardGroup.rotation.y +=
+                    difference *
+                    0.15;
+
+            }
+
+
+            /*
+            =================================================
+            IDLE FLOAT
+            =================================================
+            */
+
+            if (!casting) {
+
+                wizardGroup.position.y =
+                    Math.sin(
+                        time * 1.5
+                    ) * 0.04;
+
+            }
+
+
+            /*
+            =================================================
+            GLB ANIMATION MIXER
+            =================================================
+            */
+
+            if (mixer) {
+
+                mixer.update(
+                    0.016
+                );
+
+            }
+
+
+            /*
+            =================================================
+            CAST
+            =================================================
+            */
+
+            updateCast(
+                0.016
+            );
+
+
+            /*
+            =================================================
+            MAGIC PULSE
+            =================================================
+            */
+
+            if (
+                !casting &&
+                purpleLight
+            ) {
+
+                purpleLight.intensity =
+                    2.5 +
+                    Math.sin(
+                        time * 3
+                    ) * 0.5;
+
+            }
+
+
+            if (
+                !casting &&
+                cyanLight
+            ) {
+
+                cyanLight.intensity =
+                    1.5 +
+                    Math.sin(
+                        time * 4
+                    ) * 0.4;
+
+            }
+
+        };
+
+
     return wizardGroup;
+
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Arcane Wizard - Lightning Spell Cast</title>
+    <title>3D Arcane Wizard - Lightning Spell Cast (GLB Export)</title>
     <style>
         * {
             margin: 0;
@@ -83,19 +83,19 @@
             color: #888;
         }
     </style>
-    <!-- Import Three.js, OrbitControls, OBJExporter -->
+    <!-- Import Three.js, OrbitControls, and GLTFExporter -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/OBJExporter.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
 </head>
 <body>
     <div id="canvas-container"></div>
     <div id="ui">
         <h1>Unbound Arcanist</h1>
-        <p>Style: Low-Poly Mesh</p>
+        <p>Style: Low-Poly Mesh + GLB Animation</p>
         <div class="btn-group">
             <button id="cast-btn" class="cast-btn">⚡ CAST LIGHTNING [SPACE]</button>
-            <button id="export-btn" class="export-btn">EXPORT .OBJ & .MTL</button>
+            <button id="export-btn" class="export-btn">EXPORT ANIMATED .GLB</button>
         </div>
     </div>
     <div class="controls-hint">
@@ -148,7 +148,6 @@
         pedestal.receiveShadow = true;
         scene.add(pedestal);
 
-        // Impact scorched ground ring
         const targetRingGeo = new THREE.RingGeometry(0.3, 0.5, 8);
         const targetRingMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.3 });
         const targetRing = new THREE.Mesh(targetRingGeo, targetRingMat);
@@ -158,6 +157,7 @@
 
         // --- WIZARD CHARACTER GROUP ---
         const wizardGroup = new THREE.Group();
+        wizardGroup.name = "WizardCharacter";
         scene.add(wizardGroup);
 
         // Materials
@@ -220,6 +220,7 @@
 
         // Right Arm Pivot Group (For Casting Animation)
         const rightArmPivot = new THREE.Group();
+        rightArmPivot.name = "RightArmPivot";
         rightArmPivot.position.set(0.5, 2.5, 0);
         wizardGroup.add(rightArmPivot);
 
@@ -229,8 +230,9 @@
         rightSleeve.rotation.x = 0.5;
         rightArmPivot.add(rightSleeve);
 
-        // Staff & Floating Crystal attached to Right Arm Pivot
+        // Staff & Floating Crystal
         const staffGroup = new THREE.Group();
+        staffGroup.name = "StaffGroup";
         staffGroup.position.set(0.3, -0.5, 0.4);
 
         const shaftGeo = new THREE.CylinderGeometry(0.04, 0.05, 3.2, 5);
@@ -246,12 +248,13 @@
 
         const crystalGeo = new THREE.OctahedronGeometry(0.2, 0);
         const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+        crystal.name = "StaffCrystal";
         crystal.position.y = 2.95;
         staffGroup.add(crystal);
 
         rightArmPivot.add(staffGroup);
 
-        // --- PROCEDURAL LIGHTNING MESH SYSTEM ---
+        // --- PROCEDURAL LIGHTNING SYSTEM ---
         let lightningMesh = null;
 
         function createLightningBolt(startVec, endVec) {
@@ -267,7 +270,6 @@
 
             for (let i = 1; i < segments; i++) {
                 const nextPoint = startVec.clone().add(step.clone().multiplyScalar(i));
-                // Add jagged random deviation
                 nextPoint.x += (Math.random() - 0.5) * 0.4;
                 nextPoint.y += (Math.random() - 0.5) * 0.4;
                 nextPoint.z += (Math.random() - 0.5) * 0.4;
@@ -308,31 +310,66 @@
             }
         });
 
-        // --- OBJ & MTL EXPORT ---
-        function downloadFile(contents, filename, mimeType) {
-            const blob = new Blob([contents], { type: mimeType });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
-            URL.revokeObjectURL(link.href);
+        // --- GENERATE KEYFRAME ANIMATION FOR GLB ---
+        function createCastAnimationClip() {
+            const times = [0, 0.4, 0.9, 1.3];
+
+            // Right Arm Pivot Rotation (Euler to Quaternions)
+            const q0 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0));
+            const q1 = new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.2, 0.4, 0));
+            const q2 = new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.4, 0, 0));
+            const q3 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0));
+
+            const armRotationTrack = new THREE.QuaternionKeyframeTrack(
+                'RightArmPivot.quaternion',
+                times,
+                [
+                    q0.x, q0.y, q0.z, q0.w,
+                    q1.x, q1.y, q1.z, q1.w,
+                    q2.x, q2.y, q2.z, q2.w,
+                    q3.x, q3.y, q3.z, q3.w
+                ]
+            );
+
+            // Floating Crystal Position Track
+            const crystalPosTrack = new THREE.VectorKeyframeTrack(
+                'StaffCrystal.position',
+                [0, 0.65, 1.3],
+                [
+                    0, 2.95, 0,
+                    0, 3.05, 0,
+                    0, 2.95, 0
+                ]
+            );
+
+            return new THREE.AnimationClip('SpellCastAnimation', 1.3, [armRotationTrack, crystalPosTrack]);
         }
 
-        function generateMTL() {
-            const materials = [robeMat, innerRobeMat, trimMat, beardMat, woodMat, crystalMat];
-            let mtlText = `# Material Library for Wizard Model\n\n`;
-            materials.forEach(mat => {
-                const col = mat.color;
-                mtlText += `newmtl ${mat.name}\nKd ${col.r.toFixed(4)} ${col.g.toFixed(4)} ${col.b.toFixed(4)}\nKa 0.2000 0.2000 0.2000\nKs 0.1000 0.1000 0.1000\nNs 10.0\nd 1.0\nillum 2\n\n`;
-            });
-            return mtlText;
-        }
-
+        // --- GLB EXPORT ---
         document.getElementById('export-btn').addEventListener('click', () => {
-            const exporter = new THREE.OBJExporter();
-            let objData = `mtllib wizard_arcanist.mtl\n` + exporter.parse(wizardGroup);
-            downloadFile(objData, 'wizard_arcanist.obj', 'text/plain');
-            setTimeout(() => downloadFile(generateMTL(), 'wizard_arcanist.mtl', 'text/plain'), 300);
+            const exporter = new THREE.GLTFExporter();
+            const animClip = createCastAnimationClip();
+
+            const options = {
+                binary: true,
+                animations: [animClip]
+            };
+
+            exporter.parse(
+                wizardGroup,
+                function (gltf) {
+                    const blob = new Blob([gltf], { type: 'application/octet-stream' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'unbound_arcanist_cast.glb';
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                },
+                function (error) {
+                    console.error('GLB Export Error:', error);
+                },
+                options
+            );
         });
 
         // --- ANIMATION & RENDER LOOP ---
@@ -356,14 +393,11 @@
                 castProgress += 0.04;
 
                 if (castProgress < 0.3) {
-                    // Wind up: Raise hand and staff forward
                     rightArmPivot.rotation.x = THREE.MathUtils.lerp(rightArmPivot.rotation.x, -1.2, 0.2);
                     rightArmPivot.rotation.y = THREE.MathUtils.lerp(rightArmPivot.rotation.y, 0.4, 0.2);
                 } else if (castProgress < 0.7) {
-                    // Strike: Hold pose and bolt active
                     rightArmPivot.rotation.x = -1.4;
                     
-                    // World positions for lightning source and impact target
                     const crystalWorldPos = new THREE.Vector3();
                     crystal.getWorldPosition(crystalWorldPos);
                     
@@ -371,19 +405,16 @@
 
                     createLightningBolt(crystalWorldPos, targetPos);
 
-                    // Flash effects
                     flashLight.position.copy(crystalWorldPos);
                     flashLight.intensity = 5 + Math.random() * 5;
                     crystalMat.emissiveIntensity = 2.0;
                 } else if (castProgress < 1.0) {
-                    // Release: Fade out lightning and return arm back to idle
                     removeLightning();
                     flashLight.intensity = 0;
                     crystalMat.emissiveIntensity = 0.8;
                     rightArmPivot.rotation.x = THREE.MathUtils.lerp(rightArmPivot.rotation.x, 0, 0.15);
                     rightArmPivot.rotation.y = THREE.MathUtils.lerp(rightArmPivot.rotation.y, 0, 0.15);
                 } else {
-                    // End Animation
                     isCasting = false;
                     removeLightning();
                     flashLight.intensity = 0;
