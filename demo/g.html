@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arcane Wilds - Low Poly Magical Environment</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    overflow:hidden;
+    font-family:monospace;
+}
+
+body{
+    background:#050713;
+    color:#eee;
+}
+
+#canvas-container{
+    width:100vw;
+    height:100vh;
+}
+
+#ui{
+    position:absolute;
+    top:20px;
+    left:20px;
+    padding:15px 18px;
+    background:rgba(7,10,25,.78);
+    border:1px solid rgba(86,132,255,.35);
+    border-radius:8px;
+    box-shadow:0 8px 30px rgba(0,0,0,.45);
+    pointer-events:none;
+}
+
+#ui h1{
+    color:#8cecff;
+    font-size:17px;
+    letter-spacing:2px;
+    margin-bottom:8px;
+}
+
+#ui p{
+    color:#9ca7c7;
+    font-size:11px;
+    margin-top:4px;
+}
+
+.controls{
+    position:absolute;
+    bottom:20px;
+    left:20px;
+    padding:10px 14px;
+    background:rgba(7,10,25,.78);
+    border:1px solid rgba(86,132,255,.25);
+    border-radius:6px;
+    color:#7e8baa;
+    font-size:11px;
+    pointer-events:none;
+}
+
+#magic{
+    position:absolute;
+    right:25px;
+    top:25px;
+    width:100px;
+    height:100px;
+    border-radius:50%;
+    border:1px solid rgba(101,226,255,.3);
+    box-shadow:
+        0 0 30px rgba(0,200,255,.15),
+        inset 0 0 30px rgba(120,70,255,.1);
+    pointer-events:none;
+}
+
+#magic:before,
+#magic:after{
+    content:"";
+    position:absolute;
+    inset:14px;
+    border:1px solid rgba(110,180,255,.25);
+    border-radius:50%;
+}
+
+#magic:after{
+    inset:28px;
+    border-color:rgba(180,100,255,.35);
+}
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+
+<body>
+
+<div id="canvas-container"></div>
+
+<div id="ui">
+    <h1>THE ARCANE WILDS</h1>
+    <p>LOW-POLY MAGICAL ENVIRONMENT</p>
+    <p>Ancient magic sleeps beneath the forest...</p>
+</div>
+
+<div id="magic"></div>
+
+<div class="controls">
+    [Left Mouse] Rotate &nbsp; | &nbsp;
+    [Right Mouse] Pan &nbsp; | &nbsp;
+    [Scroll] Zoom
+</div>
+
+<script>
+
+const container = document.getElementById("canvas-container");
+
+const scene = new THREE.Scene();
+
+scene.background = new THREE.Color(0x050713);
+
+scene.fog = new THREE.FogExp2(
+    0x081026,
+    0.018
+);
+
+const camera = new THREE.PerspectiveCamera(
+    50,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+);
+
+camera.position.set(
+    11,
+    8,
+    15
+);
+
+const renderer = new THREE.WebGLRenderer({
+    antialias:true
+});
+
+renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+);
+
+renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio,2)
+);
+
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+container.appendChild(renderer.domElement);
+
+
+/* =========================================================
+   CONTROLS
+========================================================= */
+
+const controls = new THREE.OrbitControls(
+    camera,
+    renderer.domElement
+);
+
+controls.enableDamping = true;
+controls.dampingFactor = 0.045;
+
+controls.minDistance = 5;
+controls.maxDistance = 35;
+
+controls.maxPolarAngle = Math.PI / 2.05;
+
+controls.target.set(
+    0,
+    2,
+    0
+);
+
+
+/* =========================================================
+   LIGHTING
+========================================================= */
+
+const ambient = new THREE.AmbientLight(
+    0x26345f,
+    1.35
+);
+
+scene.add(ambient);
+
+
+const moonLight = new THREE.DirectionalLight(
+    0x9eb7ff,
+    1.15
+);
+
+moonLight.position.set(
+    -10,
+    18,
+    -8
+);
+
+moonLight.castShadow = true;
+
+moonLight.shadow.mapSize.width = 2048;
+moonLight.shadow.mapSize.height = 2048;
+
+moonLight.shadow.camera.left = -25;
+moonLight.shadow.camera.right = 25;
+moonLight.shadow.camera.top = 25;
+moonLight.shadow.camera.bottom = -25;
+
+scene.add(moonLight);
+
+
+/* =========================================================
+   MAGICAL GROUND
+========================================================= */
+
+const groundGeo = new THREE.CircleGeometry(
+    25,
+    32
+);
+
+const groundMat = new THREE.MeshStandardMaterial({
+    color:0x101b20,
+    roughness:.95,
+    flatShading:true
+});
+
+const ground = new THREE.Mesh(
+    groundGeo,
+    groundMat
+);
+
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+
+scene.add(ground);
+
+
+/* =========================================================
+   RANDOM HELPERS
+========================================================= */
+
+function rand(min,max){
+    return min + Math.random() * (max-min);
+}
+
+
+/* =========================================================
+   ROCKS
+========================================================= */
+
+function createRock(x,z,scale=1){
+
+    const geo = new THREE.DodecahedronGeometry(
+        rand(.35,.7),
+        0
+    );
+
+    const mat = new THREE.MeshStandardMaterial({
+        color:0x26303b,
+        roughness:1,
+        flatShading:true
+    });
+
+    const rock = new THREE.Mesh(
+        geo,
+        mat
+    );
+
+    rock.position.set(
+        x,
+        scale*.25,
+        z
+    );
+
+    rock.scale.set(
+        scale*rand(.8,1.4),
+        scale*rand(.5,1),
+        scale*rand(.8,1.3)
+    );
+
+    rock.rotation.set(
+        rand(0,1),
+        rand(0,Math.PI),
+        rand(0,1)
+    );
+
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+
+    scene.add(rock);
+}
+
+
+for(let i=0;i<45;i++){
+
+    const angle = Math.random()*Math.PI*2;
+    const radius = rand(5,23);
+
+    createRock(
+        Math.cos(angle)*radius,
+        Math.sin(angle)*radius,
+        rand(.5,1.5)
+    );
+}
+
+
+/* =========================================================
+   LOW POLY TREES
+========================================================= */
+
+function createTree(x,z,s=1){
+
+    const group = new THREE.Group();
+
+    const trunkGeo = new THREE.CylinderGeometry(
+        .18*s,
+        .3*s,
+        2.4*s,
+        6
+    );
+
+    const trunkMat = new THREE.MeshStandardMaterial({
+        color:0x3a271f,
+        roughness:.9,
+        flatShading:true
+    });
+
+    const trunk = new THREE.Mesh(
+        trunkGeo,
+        trunkMat
+    );
+
+    trunk.position.y = 1.2*s;
+
+    trunk.castShadow = true;
+
+    group.add(trunk);
+
+
+    const leafMat = new THREE.MeshStandardMaterial({
+        color:0x142f2d,
+        roughness:.9,
+        flatShading:true
+    });
+
+
+    const crown1 = new THREE.Mesh(
+        new THREE.ConeGeometry(
+            1.5*s,
+            2.6*s,
+            7
+        ),
+        leafMat
+    );
+
+    crown1.position.y = 2.6*s;
+    crown1.castShadow = true;
+
+    group.add(crown1);
+
+
+    const crown2 = new THREE.Mesh(
+        new THREE.ConeGeometry(
+            1.15*s,
+            2.2*s,
+            7
+        ),
+        leafMat
+    );
+
+    crown2.position.y = 4.0*s;
+    crown2.castShadow = true;
+
+    group.add(crown2);
+
+
+    const crown3 = new THREE.Mesh(
+        new THREE.ConeGeometry(
+            .75*s,
+            1.8*s,
+            7
+        ),
+        leafMat
+    );
+
+    crown3.position.y = 5.1*s;
+
+    crown3.castShadow = true;
+
+    group.add(crown3);
+
+
+    group.position.set(
+        x,
+        0,
+        z
+    );
+
+    group.rotation.y = rand(0,Math.PI);
+
+    scene.add(group);
+}
+
+
+for(let i=0;i<22;i++){
+
+    const angle = Math.random()*Math.PI*2;
+    const radius = rand(9,22);
+
+    createTree(
+        Math.cos(angle)*radius,
+        Math.sin(angle)*radius,
+        rand(.8,1.4)
+    );
+}
+
+
+/* =========================================================
+   MAGICAL CRYSTAL
+========================================================= */
+
+const crystalMaterial = new THREE.MeshStandardMaterial({
+
+    color:0x55ddff,
+
+    emissive:0x159dff,
+
+    emissiveIntensity:1.7,
+
+    roughness:.15,
+
+    metalness:.15,
+
+    flatShading:true
+});
+
+
+function createCrystalCluster(x,z,scale=1){
+
+    const group = new THREE.Group();
+
+    for(let i=0;i<5;i++){
+
+        const geo = new THREE.OctahedronGeometry(
+            rand(.25,.55)*scale,
+            0
+        );
+
+        const crystal = new THREE.Mesh(
+            geo,
+            crystalMaterial
+        );
+
+        crystal.position.set(
+            rand(-.5,.5)*scale,
+            rand(.25,.9)*scale,
+            rand(-.5,.5)*scale
+        );
+
+        crystal.scale.y = rand(1.4,2.6);
+
+        crystal.rotation.y = rand(0,Math.PI);
+
+        group.add(crystal);
+    }
+
+    group.position.set(
+        x,
+        0,
+        z
+    );
+
+    scene.add(group);
+
+    return group;
+}
+
+
+const crystalClusters = [];
+
+crystalClusters.push(
+    createCrystalCluster(-5,-2,1.5)
+);
+
+crystalClusters.push(
+    createCrystalCluster(5,-5,1.2)
+);
+
+crystalClusters.push(
+    createCrystalCluster(-8,6,1)
+);
+
+crystalClusters.push(
+    createCrystalCluster(7,7,.9)
+);
+
+
+/* =========================================================
+   CRYSTAL LIGHTS
+========================================================= */
+
+const crystalLight1 = new THREE.PointLight(
+    0x00d9ff,
+    3,
+    8
+);
+
+crystalLight1.position.set(
+    -5,
+    1.5,
+    -2
+);
+
+scene.add(crystalLight1);
+
+
+const crystalLight2 = new THREE.PointLight(
+    0x7a4dff,
+    2.5,
+    7
+);
+
+crystalLight2.position.set(
+    5,
+    1.5,
+    -5
+);
+
+scene.add(crystalLight2);
+
+
+/* =========================================================
+   ANCIENT STONE CIRCLE
+========================================================= */
+
+const stoneMaterial = new THREE.MeshStandardMaterial({
+    color:0x34394b,
+    roughness:1,
+    flatShading:true
+});
+
+
+for(let i=0;i<9;i++){
+
+    const angle =
+        (i/9)*Math.PI*2;
+
+    const radius = 4.3;
+
+    const stone = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+            .45,
+            .6,
+            rand(1.2,2),
+            6
+        ),
+        stoneMaterial
+    );
+
+    stone.position.set(
+        Math.cos(angle)*radius,
+        .7,
+        Math.sin(angle)*radius
+    );
+
+    stone.rotation.y = rand(0,Math.PI);
+
+    stone.rotation.z = rand(-.15,.15);
+
+    stone.castShadow = true;
+
+    scene.add(stone);
+}
+
+
+/* =========================================================
+   ARCANE RUNE PLATFORM
+========================================================= */
+
+const runeGroup = new THREE.Group();
+
+scene.add(runeGroup);
+
+
+const runeMat = new THREE.MeshBasicMaterial({
+    color:0x49dfff,
+    transparent:true,
+    opacity:.8,
+    side:THREE.DoubleSide
+});
+
+
+const runeRing1 = new THREE.Mesh(
+    new THREE.RingGeometry(
+        2.2,
+        2.27,
+        48
+    ),
+    runeMat
+);
+
+runeRing1.rotation.x = -Math.PI/2;
+
+runeGroup.add(runeRing1);
+
+
+const runeRing2 = new THREE.Mesh(
+    new THREE.RingGeometry(
+        1.5,
+        1.55,
+        24
+    ),
+    runeMat
+);
+
+runeRing2.rotation.x = -Math.PI/2;
+
+runeGroup.add(runeRing2);
+
+
+for(let i=0;i<12;i++){
+
+    const rune = new THREE.Mesh(
+        new THREE.BoxGeometry(
+            .12,
+            .03,
+            .45
+        ),
+        runeMat
+    );
+
+    const angle =
+        i/12*Math.PI*2;
+
+    rune.position.set(
+        Math.cos(angle)*1.85,
+        .035,
+        Math.sin(angle)*1.85
+    );
+
+    rune.rotation.y =
+        -angle;
+
+    runeGroup.add(rune);
+}
+
+
+/* =========================================================
+   CENTRAL ALTAR
+========================================================= */
+
+const altarBase = new THREE.Mesh(
+    new THREE.CylinderGeometry(
+        1.35,
+        1.6,
+        .65,
+        8
+    ),
+    stoneMaterial
+);
+
+altarBase.position.y = .32;
+
+altarBase.castShadow = true;
+
+scene.add(altarBase);
+
+
+const altarTop = new THREE.Mesh(
+    new THREE.CylinderGeometry(
+        1.05,
+        1.2,
+        .18,
+        8
+    ),
+    new THREE.MeshStandardMaterial({
+        color:0x20283d,
+        emissive:0x07152a,
+        roughness:.5,
+        flatShading:true
+    })
+);
+
+altarTop.position.y = .73;
+
+scene.add(altarTop);
+
+
+/* =========================================================
+   FLOATING MAGIC CRYSTAL
+========================================================= */
+
+const centralCrystal = new THREE.Mesh(
+    new THREE.OctahedronGeometry(
+        .55,
+        0
+    ),
+    new THREE.MeshStandardMaterial({
+        color:0x72eaff,
+        emissive:0x238dff,
+        emissiveIntensity:2.4,
+        roughness:.1,
+        flatShading:true
+    })
+);
+
+centralCrystal.position.y = 2.1;
+
+centralCrystal.castShadow = true;
+
+scene.add(centralCrystal);
+
+
+const centralLight = new THREE.PointLight(
+    0x35dfff,
+    4,
+    9
+);
+
+centralLight.position.set(
+    0,
+    2,
+    0
+);
+
+scene.add(centralLight);
+
+
+/* =========================================================
+   MAGICAL MUSHROOMS
+========================================================= */
+
+function createMushroom(x,z,s=1){
+
+    const group = new THREE.Group();
+
+    const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+            .1*s,
+            .16*s,
+            .55*s,
+            6
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0xc3c8d1,
+            roughness:.8,
+            flatShading:true
+        })
+    );
+
+    stem.position.y=.27*s;
+
+    group.add(stem);
+
+
+    const cap = new THREE.Mesh(
+        new THREE.ConeGeometry(
+            .42*s,
+            .3*s,
+            8
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0x764dff,
+            emissive:0x3b18a5,
+            emissiveIntensity:1,
+            flatShading:true
+        })
+    );
+
+    cap.position.y=.62*s;
+
+    group.add(cap);
+
+
+    group.position.set(
+        x,
+        0,
+        z
+    );
+
+    scene.add(group);
+}
+
+
+for(let i=0;i<28;i++){
+
+    const angle = Math.random()*Math.PI*2;
+    const radius = rand(5,20);
+
+    createMushroom(
+        Math.cos(angle)*radius,
+        Math.sin(angle)*radius,
+        rand(.5,1.2)
+    );
+}
+
+
+/* =========================================================
+   FIREFLIES / MAGIC PARTICLES
+========================================================= */
+
+const particleCount = 500;
+
+const particleGeo = new THREE.BufferGeometry();
+
+const positions = new Float32Array(
+    particleCount*3
+);
+
+const particleData = [];
+
+for(let i=0;i<particleCount;i++){
+
+    positions[i*3] =
+        rand(-20,20);
+
+    positions[i*3+1] =
+        rand(.3,8);
+
+    positions[i*3+2] =
+        rand(-20,20);
+
+    particleData.push({
+        speed:rand(.2,.8),
+        offset:Math.random()*Math.PI*2
+    });
+}
+
+particleGeo.setAttribute(
+    "position",
+    new THREE.BufferAttribute(
+        positions,
+        3
+    )
+);
+
+
+const particleMat =
+    new THREE.PointsMaterial({
+
+        color:0x70eaff,
+
+        size:.055,
+
+        transparent:true,
+
+        opacity:.75,
+
+        blending:THREE.AdditiveBlending,
+
+        depthWrite:false
+    });
+
+
+const particles = new THREE.Points(
+    particleGeo,
+    particleMat
+);
+
+scene.add(particles);
+
+
+/* =========================================================
+   FLOATING MAGIC ORBS
+========================================================= */
+
+const orbGroup = new THREE.Group();
+
+scene.add(orbGroup);
+
+const orbMat = new THREE.MeshBasicMaterial({
+    color:0x9c7cff
+});
+
+
+for(let i=0;i<15;i++){
+
+    const orb = new THREE.Mesh(
+        new THREE.SphereGeometry(
+            rand(.04,.1),
+            6,
+            6
+        ),
+        orbMat
+    );
+
+    orb.position.set(
+        rand(-9,9),
+        rand(1,6),
+        rand(-9,9)
+    );
+
+    orbGroup.add(orb);
+}
+
+
+/* =========================================================
+   FALLEN LOGS
+========================================================= */
+
+function createLog(x,z){
+
+    const log = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+            .22,
+            .3,
+            2.5,
+            6
+        ),
+        new THREE.MeshStandardMaterial({
+            color:0x352318,
+            roughness:1,
+            flatShading:true
+        })
+    );
+
+    log.position.set(
+        x,
+        .25,
+        z
+    );
+
+    log.rotation.z =
+        Math.PI/2;
+
+    log.rotation.y =
+        rand(0,Math.PI);
+
+    log.castShadow = true;
+
+    scene.add(log);
+}
+
+
+createLog(-7,-7);
+createLog(8,-1);
+createLog(-10,2);
+
+
+/* =========================================================
+   MAGIC VINES / ENERGY BEAMS
+========================================================= */
+
+const beamMaterial = new THREE.LineBasicMaterial({
+    color:0x6defff,
+    transparent:true,
+    opacity:.35
+});
+
+
+function createMagicBeam(angle){
+
+    const points=[];
+
+    for(let i=0;i<8;i++){
+
+        const r=i*.65;
+
+        points.push(
+            new THREE.Vector3(
+                Math.cos(angle)*r,
+                1 + i*.08,
+                Math.sin(angle)*r
+            )
+        );
+    }
+
+    const geo =
+        new THREE.BufferGeometry()
+            .setFromPoints(points);
+
+    const line =
+        new THREE.Line(
+            geo,
+            beamMaterial
+        );
+
+    scene.add(line);
+}
+
+
+for(let i=0;i<8;i++){
+
+    createMagicBeam(
+        i/8*Math.PI*2
+    );
+}
+
+
+/* =========================================================
+   DISTANT MOUNTAINS
+========================================================= */
+
+const mountainMat =
+    new THREE.MeshStandardMaterial({
+        color:0x101827,
+        roughness:1,
+        flatShading:true
+    });
+
+
+for(let i=0;i<14;i++){
+
+    const mountain = new THREE.Mesh(
+        new THREE.ConeGeometry(
+            rand(3,6),
+            rand(7,13),
+            6
+        ),
+        mountainMat
+    );
+
+    const angle =
+        i/14*Math.PI*2;
+
+    const radius=25;
+
+    mountain.position.set(
+        Math.cos(angle)*radius,
+        3,
+        Math.sin(angle)*radius
+    );
+
+    mountain.rotation.y =
+        rand(0,Math.PI);
+
+    scene.add(mountain);
+}
+
+
+/* =========================================================
+   MOON
+========================================================= */
+
+const moon = new THREE.Mesh(
+    new THREE.SphereGeometry(
+        3,
+        16,
+        16
+    ),
+    new THREE.MeshBasicMaterial({
+        color:0xc6d6ff
+    })
+);
+
+moon.position.set(
+    -18,
+    18,
+    -22
+);
+
+scene.add(moon);
+
+
+const moonGlow = new THREE.PointLight(
+    0x849eff,
+    2,
+    20
+);
+
+moonGlow.position.copy(
+    moon.position
+);
+
+scene.add(moonGlow);
+
+
+/* =========================================================
+   ANIMATION
+========================================================= */
+
+const clock =
+    new THREE.Clock();
+
+function animate(){
+
+    requestAnimationFrame(
+        animate
+    );
+
+    const time =
+        clock.getElapsedTime();
+
+
+    /* Crystal */
+
+    centralCrystal.rotation.y =
+        time*.8;
+
+    centralCrystal.rotation.x =
+        Math.sin(time)*.2;
+
+    centralCrystal.position.y =
+        2.1 +
+        Math.sin(time*2)*.18;
+
+
+    /* Central magical light */
+
+    centralLight.intensity =
+        3.2 +
+        Math.sin(time*3)*1;
+
+
+    /* Crystal lights */
+
+    crystalLight1.intensity =
+        2.5 +
+        Math.sin(time*2.5)*.8;
+
+    crystalLight2.intensity =
+        2 +
+        Math.sin(time*3.2)*.7;
+
+
+    /* Rune rotation */
+
+    runeRing1.rotation.z =
+        time*.15;
+
+    runeRing2.rotation.z =
+        -time*.3;
+
+
+    /* Particles */
+
+    const pos =
+        particleGeo.attributes.position.array;
+
+    for(let i=0;i<particleCount;i++){
+
+        const index=i*3;
+
+        pos[index+1] +=
+            particleData[i].speed*.008;
+
+        pos[index] +=
+            Math.sin(
+                time +
+                particleData[i].offset
+            )*.002;
+
+        if(pos[index+1]>8){
+            pos[index+1]=.3;
+        }
+    }
+
+    particleGeo.attributes.position.needsUpdate=true;
+
+
+    /* Floating orbs */
+
+    orbGroup.children.forEach(
+        (orb,i)=>{
+
+            orb.position.y +=
+                Math.sin(
+                    time*1.5+i
+                )*.003;
+
+            orb.position.x +=
+                Math.sin(
+                    time*.5+i
+                )*.001;
+        }
+    );
+
+
+    /* Magic beams */
+
+    runeGroup.scale.setScalar(
+        1 +
+        Math.sin(time*2)*.025
+    );
+
+
+    controls.update();
+
+    renderer.render(
+        scene,
+        camera
+    );
+}
+
+
+animate();
+
+
+/* =========================================================
+   RESIZE
+========================================================= */
+
+window.addEventListener(
+    "resize",
+    ()=>{
+        camera.aspect =
+            window.innerWidth /
+            window.innerHeight;
+
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+    }
+);
+
+</script>
+
+</body>
+</html>

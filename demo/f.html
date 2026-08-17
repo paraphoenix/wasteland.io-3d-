@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Arcane Wizard - Three.js</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+            font-family: monospace;
+        }
+        body {
+            background-color: #0d0d14;
+            color: #eee;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(18, 18, 26, 0.85);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #2a2a38;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        h1 {
+            font-size: 16px;
+            color: #00f0ff;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        p {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 4px;
+        }
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(18, 18, 26, 0.85);
+            padding: 10px 14px;
+            border-radius: 6px;
+            border: 1px solid #2a2a38;
+            font-size: 11px;
+            color: #888;
+        }
+    </style>
+    <!-- Import Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="ui">
+        <h1>Unbound Arcanist</h1>
+        <p>3D Low-Poly Character Mesh</p>
+        <p>Status: Channeling Arcane Energy</p>
+    </div>
+    <div class="controls-hint">
+        [Left Mouse] Rotate | [Right Mouse] Pan | [Scroll] Zoom
+    </div>
+
+    <script>
+        // --- SCENE SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0d0d14);
+        scene.fog = new THREE.FogExp2(0x0d0d14, 0.03);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 3, 8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 + 0.1; // Don't go far below floor
+        controls.target.set(0, 1.8, 0);
+
+        // --- LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0x1a1a2e, 1.2);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 7);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        scene.add(dirLight);
+
+        const staffLight = new THREE.PointLight(0x00f0ff, 2, 5);
+        staffLight.position.set(0.9, 3.2, 0.5);
+        scene.add(staffLight);
+
+        // --- FLOOR GRID & PEDESTAL ---
+        const gridHelper = new THREE.GridHelper(20, 20, 0x2a2a38, 0x181824);
+        scene.add(gridHelper);
+
+        const pedestalGeo = new THREE.CylinderGeometry(1.8, 2, 0.2, 8);
+        const pedestalMat = new THREE.MeshStandardMaterial({ color: 0x181824, roughness: 0.8 });
+        const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
+        pedestal.position.y = -0.1;
+        pedestal.receiveShadow = true;
+        scene.add(pedestal);
+
+        // --- WIZARD CHARACTER GROUP ---
+        const wizardGroup = new THREE.Group();
+        scene.add(wizardGroup);
+
+        // Materials
+        const robeMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.6, flatShading: true });
+        const innerRobeMat = new THREE.MeshStandardMaterial({ color: 0x1a252f, roughness: 0.7, flatShading: true });
+        const trimMat = new THREE.MeshStandardMaterial({ color: 0x8e44ad, roughness: 0.4, flatShading: true });
+        const beardMat = new THREE.MeshStandardMaterial({ color: 0xecf0f1, roughness: 0.9, flatShading: true });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e18, roughness: 0.8, flatShading: true });
+        const crystalMat = new THREE.MeshStandardMaterial({ 
+            color: 0x00f0ff, 
+            emissive: 0x00aaff, 
+            emissiveIntensity: 0.8, 
+            roughness: 0.2, 
+            flatShading: true 
+        });
+
+        // 1. Lower Robe Base (Skirt)
+        const skirtGeo = new THREE.ConeGeometry(0.9, 2.2, 8, 1, true);
+        const skirt = new THREE.Mesh(skirtGeo, robeMat);
+        skirt.position.y = 1.1;
+        skirt.castShadow = true;
+        wizardGroup.add(skirt);
+
+        // 2. Upper Torso
+        const torsoGeo = new THREE.CylinderGeometry(0.4, 0.6, 1.2, 7);
+        const torso = new THREE.Mesh(torsoGeo, robeMat);
+        torso.position.y = 2.2;
+        torso.castShadow = true;
+        wizardGroup.add(torso);
+
+        // Mantle / Shoulder Trim
+        const mantleGeo = new THREE.ConeGeometry(0.75, 0.5, 7);
+        const mantle = new THREE.Mesh(mantleGeo, trimMat);
+        mantle.position.y = 2.7;
+        mantle.rotation.x = Math.PI;
+        wizardGroup.add(mantle);
+
+        // 3. Head & Hood
+        const hoodGeo = new THREE.ConeGeometry(0.45, 0.9, 6);
+        const hood = new THREE.Mesh(hoodGeo, robeMat);
+        hood.position.set(0, 3.1, -0.05);
+        hood.rotation.x = -0.2;
+        wizardGroup.add(hood);
+
+        const faceShadowGeo = new THREE.SphereGeometry(0.25, 6, 6);
+        const faceShadow = new THREE.Mesh(faceShadowGeo, innerRobeMat);
+        faceShadow.position.set(0, 2.95, 0.1);
+        wizardGroup.add(faceShadow);
+
+        // 4. Beard
+        const beardGeo = new THREE.ConeGeometry(0.28, 0.9, 5);
+        const beard = new THREE.Mesh(beardGeo, beardMat);
+        beard.position.set(0, 2.65, 0.25);
+        beard.rotation.x = 0.2;
+        wizardGroup.add(beard);
+
+        // 5. Arms & Sleeves
+        const sleeveGeo = new THREE.CylinderGeometry(0.15, 0.3, 1.0, 6);
+        
+        // Left Arm
+        const leftSleeve = new THREE.Mesh(sleeveGeo, robeMat);
+        leftSleeve.position.set(-0.6, 2.3, 0.1);
+        leftSleeve.rotation.z = 0.4;
+        leftSleeve.rotation.x = -0.2;
+        wizardGroup.add(leftSleeve);
+
+        // Right Arm (Holding Staff)
+        const rightSleeve = new THREE.Mesh(sleeveGeo, robeMat);
+        rightSleeve.position.set(0.6, 2.3, 0.2);
+        rightSleeve.rotation.z = -0.4;
+        rightSleeve.rotation.x = 0.5;
+        wizardGroup.add(rightSleeve);
+
+        // 6. Staff & Floating Crystal
+        const staffGroup = new THREE.Group();
+        staffGroup.position.set(0.8, 1.2, 0.4);
+
+        const shaftGeo = new THREE.CylinderGeometry(0.04, 0.05, 3.2, 5);
+        const shaft = new THREE.Mesh(shaftGeo, woodMat);
+        shaft.position.y = 1.1;
+        shaft.castShadow = true;
+        staffGroup.add(shaft);
+
+        // Staff Top Cusp
+        const cuspGeo = new THREE.ConeGeometry(0.2, 0.5, 5, 1, true);
+        const cusp = new THREE.Mesh(cuspGeo, trimMat);
+        cusp.position.y = 2.6;
+        cusp.rotation.x = Math.PI;
+        staffGroup.add(cusp);
+
+        // Floating Crystal (Octahedron)
+        const crystalGeo = new THREE.OctahedronGeometry(0.2, 0);
+        const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+        crystal.position.y = 2.95;
+        staffGroup.add(crystal);
+
+        wizardGroup.add(staffGroup);
+
+        // --- ANIMATION LOOP ---
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = clock.getElapsedTime();
+
+            // Hover / Idle Float animation for the Wizard
+            wizardGroup.position.y = Math.sin(time * 1.5) * 0.08 + 0.08;
+
+            // Rotate and bob floating crystal
+            crystal.rotation.y = time * 1.2;
+            crystal.rotation.x = Math.sin(time) * 0.3;
+            crystal.position.y = 2.95 + Math.sin(time * 3) * 0.05;
+
+            // Dynamic Staff Light pulse
+            staffLight.intensity = 1.5 + Math.sin(time * 4) * 0.5;
+            staffLight.position.set(
+                wizardGroup.position.x + staffGroup.position.x,
+                wizardGroup.position.y + staffGroup.position.y + crystal.position.y,
+                wizardGroup.position.z + staffGroup.position.z
+            );
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // --- RESIZE EVENT HANDLER ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
