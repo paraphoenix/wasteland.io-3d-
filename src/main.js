@@ -1,3 +1,4 @@
+
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
@@ -20,6 +21,10 @@ import { createMagicOrbs } from "./magic/MagicOrbs.js";
 
 import { createWizard } from "./characters/Wizard.js";
 
+import {
+    createThirdPersonCamera
+} from "./camera/ThirdPersonCamera.js";
+
 
 /*
 =========================================================
@@ -27,45 +32,27 @@ ENGINE
 =========================================================
 */
 
-const scene = createScene();
+const scene =
+    createScene();
 
-const camera = createCamera();
 
-const renderer = createRenderer();
+const camera =
+    createCamera();
+
+
+const renderer =
+    createRenderer();
+
 
 document
     .getElementById("app")
-    .appendChild(renderer.domElement);
+    .appendChild(
+        renderer.domElement
+    );
 
-createLighting(scene);
 
-
-/*
-=========================================================
-CONTROLS
-=========================================================
-*/
-
-const controls = new OrbitControls(
-    camera,
-    renderer.domElement
-);
-
-controls.enableDamping = true;
-
-controls.dampingFactor = 0.05;
-
-controls.minDistance = 5;
-
-controls.maxDistance = 35;
-
-controls.maxPolarAngle =
-    Math.PI / 2.05;
-
-controls.target.set(
-    0,
-    1.5,
-    0
+createLighting(
+    scene
 );
 
 
@@ -75,21 +62,44 @@ ENVIRONMENT
 =========================================================
 */
 
-createGround(scene);
+createGround(
+    scene
+);
 
-createMountains(scene);
 
-createTrees(scene);
+createMountains(
+    scene
+);
 
-createRocks(scene);
 
-createCrystals(scene);
+createTrees(
+    scene
+);
 
-createMushrooms(scene);
 
-createAncientRuins(scene);
+createRocks(
+    scene
+);
 
-createMagicalParticles(scene);
+
+createCrystals(
+    scene
+);
+
+
+createMushrooms(
+    scene
+);
+
+
+createAncientRuins(
+    scene
+);
+
+
+createMagicalParticles(
+    scene
+);
 
 
 /*
@@ -98,18 +108,59 @@ MAGIC
 =========================================================
 */
 
-createRuneCircle(scene);
+createRuneCircle(
+    scene
+);
 
-createMagicOrbs(scene);
+
+createMagicOrbs(
+    scene
+);
 
 
 /*
 =========================================================
-CHARACTER
+WIZARD
 =========================================================
 */
 
-createWizard(scene);
+const wizard =
+    createWizard(
+        scene
+    );
+
+
+/*
+=========================================================
+THIRD PERSON CAMERA
+=========================================================
+*/
+
+const thirdPersonCamera =
+    createThirdPersonCamera(
+        camera,
+        wizard
+    );
+
+
+/*
+=========================================================
+INITIAL CAMERA
+=========================================================
+*/
+
+camera.position.set(
+    0,
+    5,
+    8
+);
+
+
+camera.lookAt(
+    0,
+    1.5,
+    0
+);
 
 
 /*
@@ -133,11 +184,42 @@ function animate() {
         clock.getElapsedTime();
 
 
-    controls.update();
+    /*
+    -----------------------------------------------
+    UPDATE WIZARD
+    -----------------------------------------------
+    */
 
+    if (
+        wizard.userData &&
+        typeof wizard.userData.update ===
+        "function"
+    ) {
+
+        wizard.userData.update(
+            time
+        );
+
+    }
+
+
+    /*
+    -----------------------------------------------
+    UPDATE ENVIRONMENT
+    -----------------------------------------------
+    */
 
     scene.traverse(
         (object) => {
+
+            if (
+                object === wizard
+            ) {
+
+                return;
+
+            }
+
 
             if (
                 object.userData &&
@@ -155,10 +237,26 @@ function animate() {
     );
 
 
+    /*
+    -----------------------------------------------
+    CAMERA
+    -----------------------------------------------
+    */
+
+    thirdPersonCamera.update();
+
+
+    /*
+    -----------------------------------------------
+    RENDER
+    -----------------------------------------------
+    */
+
     renderer.render(
         scene,
         camera
     );
+
 }
 
 

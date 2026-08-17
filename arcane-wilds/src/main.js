@@ -19,6 +19,12 @@ import { createAncientRuins } from "./environment/AncientRuins.js";
 import { createRuneCircle } from "./magic/RuneCircle.js";
 import { createMagicOrbs } from "./magic/MagicOrbs.js";
 
+import { createWizard } from "./characters/Wizard.js";
+
+import {
+    createThirdPersonCamera
+} from "./camera/ThirdPersonCamera.js";
+
 
 /*
 =========================================================
@@ -26,43 +32,27 @@ ENGINE
 =========================================================
 */
 
-const scene = createScene();
+const scene =
+    createScene();
 
-const camera = createCamera();
 
-const renderer = createRenderer();
+const camera =
+    createCamera();
+
+
+const renderer =
+    createRenderer();
+
 
 document
     .getElementById("app")
-    .appendChild(renderer.domElement);
+    .appendChild(
+        renderer.domElement
+    );
 
-createLighting(scene);
 
-
-/*
-=========================================================
-CONTROLS
-=========================================================
-*/
-
-const controls = new OrbitControls(
-    camera,
-    renderer.domElement
-);
-
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-
-controls.minDistance = 5;
-controls.maxDistance = 35;
-
-controls.maxPolarAngle =
-    Math.PI / 2.05;
-
-controls.target.set(
-    0,
-    1.5,
-    0
+createLighting(
+    scene
 );
 
 
@@ -72,21 +62,44 @@ ENVIRONMENT
 =========================================================
 */
 
-createGround(scene);
+createGround(
+    scene
+);
 
-createMountains(scene);
 
-createTrees(scene);
+createMountains(
+    scene
+);
 
-createRocks(scene);
 
-createCrystals(scene);
+createTrees(
+    scene
+);
 
-createMushrooms(scene);
 
-createAncientRuins(scene);
+createRocks(
+    scene
+);
 
-createMagicalParticles(scene);
+
+createCrystals(
+    scene
+);
+
+
+createMushrooms(
+    scene
+);
+
+
+createAncientRuins(
+    scene
+);
+
+
+createMagicalParticles(
+    scene
+);
 
 
 /*
@@ -95,9 +108,59 @@ MAGIC
 =========================================================
 */
 
-createRuneCircle(scene);
+createRuneCircle(
+    scene
+);
 
-createMagicOrbs(scene);
+
+createMagicOrbs(
+    scene
+);
+
+
+/*
+=========================================================
+WIZARD
+=========================================================
+*/
+
+const wizard =
+    createWizard(
+        scene
+    );
+
+
+/*
+=========================================================
+THIRD PERSON CAMERA
+=========================================================
+*/
+
+const thirdPersonCamera =
+    createThirdPersonCamera(
+        camera,
+        wizard
+    );
+
+
+/*
+=========================================================
+INITIAL CAMERA
+=========================================================
+*/
+
+camera.position.set(
+    0,
+    5,
+    8
+);
+
+
+camera.lookAt(
+    0,
+    1.5,
+    0
+);
 
 
 /*
@@ -106,33 +169,96 @@ ANIMATION
 =========================================================
 */
 
-const clock = new THREE.Clock();
+const clock =
+    new THREE.Clock();
+
 
 function animate() {
 
-    requestAnimationFrame(animate);
+    requestAnimationFrame(
+        animate
+    );
+
 
     const time =
         clock.getElapsedTime();
 
-    controls.update();
 
-    scene.traverse((object) => {
+    /*
+    -----------------------------------------------
+    UPDATE WIZARD
+    -----------------------------------------------
+    */
 
-        if (
-            object.userData &&
-            typeof object.userData.update === "function"
-        ) {
-            object.userData.update(time);
+    if (
+        wizard.userData &&
+        typeof wizard.userData.update ===
+        "function"
+    ) {
+
+        wizard.userData.update(
+            time
+        );
+
+    }
+
+
+    /*
+    -----------------------------------------------
+    UPDATE ENVIRONMENT
+    -----------------------------------------------
+    */
+
+    scene.traverse(
+        (object) => {
+
+            if (
+                object === wizard
+            ) {
+
+                return;
+
+            }
+
+
+            if (
+                object.userData &&
+                typeof object.userData.update ===
+                "function"
+            ) {
+
+                object.userData.update(
+                    time
+                );
+
+            }
+
         }
+    );
 
-    });
+
+    /*
+    -----------------------------------------------
+    CAMERA
+    -----------------------------------------------
+    */
+
+    thirdPersonCamera.update();
+
+
+    /*
+    -----------------------------------------------
+    RENDER
+    -----------------------------------------------
+    */
 
     renderer.render(
         scene,
         camera
     );
+
 }
+
 
 animate();
 
@@ -151,7 +277,9 @@ window.addEventListener(
             window.innerWidth /
             window.innerHeight;
 
+
         camera.updateProjectionMatrix();
+
 
         renderer.setSize(
             window.innerWidth,
